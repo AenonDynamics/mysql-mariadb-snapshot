@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+
+# -----------------------------------------------------------------------------
+# - Aenon Dynamics MySQL/MariaDB Backup
+# - Backups all tables as well as views automatically
+#
+# - Author: Andi Dittrich <opensource@aenon-dynamics.com>
+# - License: The MIT License (X11 License)
+# - Website: https://github.com/AenonDynamics/mysql-mariadb-snapshot
+# -----------------------------------------------------------------------------
+
+# vars
+NOW=$(date +"%d-%m-%Y")
+
+# Error Check
+RETURN_CODE=0
+
+# config file set ?
+if [ -z "$1" ]; then
+    echo "Usage: $0 <config>"
+    exit 1
+fi
+
+# config file available ?
+if [ ! -f "$1" ]; then
+    echo "Config file ($1) not found"
+    exit 2
+fi
+
+# Load Config
+source $1
+
+# Check Binaries
+# ------------------------------------
+if [ ! -x "$MYSQL_BIN" ]; then
+    echo "ERROR: mysql binary not found ($MYSQL_BIN). BACKUP FAILED"
+    exit 3
+fi
+if [ ! -x "$MYSQLDUMP_BIN" ]; then
+    echo "ERROR: mysqldump binary not found ($MYSQLDUMP_BIN). BACKUP FAILED"
+    exit 4
+fi
+
+# Check Backup Destination
+# ------------------------------------
+if [ ! -d "$MYSQL_BACKUP_LOCATION" ]; then
+    echo "ERROR: Backup destination does not exist ($MYSQL_BACKUP_LOCATION). BACKUP FAILED"
+    exit 5
+fi
+
+# get permission (not world readable)
+stat -c "%a" $MYSQL_BACKUP_LOCATION | grep "..[0]" > /dev/null
+
+# check success
+if [ $? -ne 0 ]; then
+    echo "ERROR: Backup destination is world accessible. Check directory permissions! BACKUP FAILED"
+    exit 6
+fi
+
+# Get Database List
+# ------------------------------------
+DB_LIST="$($MYSQL_BIN --defaults-extra-file=$MYSQL_CONF --socket=$MYSQL_SOCKET -Be 'show databases' | grep -Ev $MYSQL_DB_IGNORE)"
+
+# check success
+if [ $? -ne 0 ]; then
+    echo "ERROR: Cannot fetch Database list. BACKUP FAILED"
+    exit 7
+fi
+
+# Prepare tmp dir
+# -----------------------------------
+mkdir -p $MYSQL_TMP_DIR/$NOW
+chmod 0770 $MYSQL_TMP_DIR
+
+# Run Mysqldump for each database
+# -----------------------------------
+echo ""
+echo "Dumping Databases.."
+for DB in $DB_LIST; do
+    echo " |- $DB"
+
+    # get all views; extract first column
+    VIEWS=$(echo "SHOW FULL TABLES FROM \`$DB\` WHERE table_type="\""VIEW"\" | $MYSQL_BIN --defaults-extra-file=$MYSQL_CONF --socket=$MYSQL_SOCKET -Bs | cut -f1)
+
+    # generate arguments
+    IGNORE_VIEWS=""
+    for VIEW in $VIEWS; do
+        IGNORE_VIEWS="$IGNORE_VIEWS --ignore-table \'$DB\'.\'$VIEW\'"
+    done
+
+    # dump db DATA (exclude views)
+    $MYSQLDUMP_BIN --defaults-extra-file=$MYSQL_CONF --socket=$MYSQL_SOCKET $MYSQLDUMP_OPT --no-create-info --skip-triggers $IGNORE_VIEWS $DB > $MYSQL_TMP_DIR/$NOW/$DB.data.sql
+
+    # check success
+    if [ $? -ne 0 ]; then
+        echo " |- ERROR: mysqldump of $DB DATA failed!"
+        RETURN_CODE=10
+        continue
+    fi
+
+    # dump db STRUCTURE (including views)
+    $MYSQLDUMP_BIN --defaults-extra-file=$MYSQL_CONF --socket=$MYSQL_SOCKET $MYSQLDUMP_OPT --no-data $DB > $MYSQL_TMP_DIR/$NOW/$DB.structure.sql
+
+    # check success
+    if [ $? -ne 0 ]; then
+        echo " |- ERROR: mysqldump of $DB STRUCTURE failed!"
+        RETURN_CODE=11
+        continue
+    fi
+done
+
+# Create Archive
+# -----------------------------------
+cd $MYSQL_TMP_DIR
+echo ""
+echo "Compressing Backup.."
+echo " |- location $MYSQL_BACKUP_LOCATION/$MYSQL_BACKUPFILE"
+
+# tar, bzip2
+tar cfj $MYSQL_BACKUP_LOCATION/$MYSQL_BACKUPFILE $NOW
+
+# Checkup
+if [ $? -ne 0 ]; then
+    echo " |- ERROR: cannot create Backup Archive"
+    RETURN_CODE=12
+else
+    # show size
+    FSIZE=$(du -h $MYSQL_BACKUP_LOCATION/$MYSQL_BACKUPFILE | cut -f1)
+
+    echo " |- completed | $FSIZE"
+fi
+
+# Cleanup tmp dir
+# -----------------------------------
+echo ""
+echo "Cleaning up temporary data.."
+rm $MYSQL_TMP_DIR/$NOW/*
+rmdir $MYSQL_TMP_DIR/$NOW
+
+# Old File Cleanup
+# ------------------------------------
+
+# min 10 days (security)
+if [ "$MYSQL_BACKUP_LIFETIME" -gt "10" ]; then
+    echo ""
+    echo "Dropping old backups.."
+    find $MYSQL_BACKUP_LOCATION -name "*.tar.bz2" -type f -mtime +$MYSQL_BACKUP_LIFETIME -delete
+    echo " |- completed"
+fi
+
+# Done
+exit $RETURN_CODE

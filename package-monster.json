@@ -1,0 +1,33 @@
+{
+    "name": "mysql-mariadb-snapshot",
+    "version": "0.1.0",
+    "package-monster": "0.2.0",
+    "description": "Backups MySQL tables and views with mysqldump",
+    "license": "MIT",
+    "author": "Andi Dittrich <opensource@aenon-dynamics.com>",
+    "website": "https://github.com/AenonDynamics/mysql-mariadb-snapshot",
+    "bugs": "https://github.com/AenonDynamics/mysql-mariadb-snapshot/issues",
+    "multiversion": false,
+
+    "debian": {
+
+        "dependencies": [
+        ],
+
+        "conf": [
+            "backup.conf",
+            "credentials.example.conf"
+        ],
+
+        "bin": [
+            "mysql-mariadb-snapshot"
+        ],
+
+        "sbin": [
+        ],
+
+        "scripts": {
+        }
+    }
+
+}
