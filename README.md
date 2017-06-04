@@ -1,11 +1,11 @@
 MYSQL-MARIADB-SNAPSHOT
 =============================
 
-Backups MySQL tables and views with mysqldump
+Backups MySQL/MariaDB tables and views separately with mysqldump. Each table/structure as single file within a tgz archive.
 
 ## Features ##
 
-* Dump Tables+Views separately
+* Dumps Tables+Views separately (two files for each database)
 * Suitable to use with small Databases < 1GB
 * Exclude Databases from backup
 * Backups are stored as compressed `.tar.bz2` archives

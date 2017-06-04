@@ -1,3 +1,7 @@
+### 0.2.0 ###
+Added: Section/Priority Entries
+Changed: General Description
+
 ### 0.1.1 ###
 Added: Changelog
 

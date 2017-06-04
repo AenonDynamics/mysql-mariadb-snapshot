@@ -11,6 +11,9 @@
 
     "debian": {
 
+        "section": "database",
+        "priority": "extra",
+
         "dependencies": [
         ],
 
