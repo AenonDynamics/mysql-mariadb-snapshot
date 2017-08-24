@@ -1,6 +1,6 @@
 {
     "name": "mysql-mariadb-snapshot",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "package-monster": "0.2.0",
     "description": "Backups MySQL tables and views with mysqldump",
     "license": "MIT",
@@ -18,8 +18,8 @@
         ],
 
         "conf": [
-            "backup.conf",
-            "credentials.example.conf"
+            "config/backup.conf",
+            "config/credentials.example.conf"
         ],
 
         "bin": [

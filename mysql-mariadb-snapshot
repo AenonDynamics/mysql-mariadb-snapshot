@@ -99,7 +99,7 @@ for DB in $DB_LIST; do
     fi
 
     # dump db STRUCTURE (including views)
-    $MYSQLDUMP_BIN --defaults-extra-file=$MYSQL_CONF --socket=$MYSQL_SOCKET $MYSQLDUMP_OPT --no-data $DB > $MYSQL_TMP_DIR/$NOW/$DB.structure.sql
+    $MYSQLDUMP_BIN --defaults-extra-file=$MYSQL_CONF --socket=$MYSQL_SOCKET $MYSQLDUMP_OPT --no-data --triggers --routines --create-options $DB > $MYSQL_TMP_DIR/$NOW/$DB.structure.sql
 
     # check success
     if [ $? -ne 0 ]; then

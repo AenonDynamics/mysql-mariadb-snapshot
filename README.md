@@ -67,6 +67,12 @@ Note: in case you want to use another account then **debian-sys-maint** it is **
 echo "15  4  *  *  * root /usr/bin/mysql-mariadb-snapshot /etc/mysql-mariadb-snapshot/backup.conf" > /etc/cron.d/mysql-mariadb-snapshot
 ```
 
+## Usage ##
+
+```
+mysql-mariadb-snapshot <config>
+```
+
 ## Distributions ##
 
 Tested with:
