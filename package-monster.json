@@ -32,7 +32,7 @@
         "files": [
             {
                 "src": "systemd/mysql-mariadb-snapshot.service",
-                "dst": "/lib/systemd/system/mysql-mariadb-snapshot.service"
+                "dst": "/lib/systemd/system/mysql-mariadb-snapshot@.service"
             },
             {
                 "src": "systemd/mysql-mariadb-snapshot.timer",
