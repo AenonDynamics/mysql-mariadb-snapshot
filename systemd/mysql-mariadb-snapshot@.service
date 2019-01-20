@@ -1,0 +1,13 @@
+[Unit]
+Description=mysql-mariadb-snapshot
+
+[Service]
+# Service is just a script, no deamon; ExecStop will be directly invoked after ExecStart
+Type=oneshot
+
+# binary location
+# use instance argument as config file name
+ExecStart=/usr/bin/mysql-mariadb-snapshot /etc/mysql-mariadb-snapshot/%I.conf
+
+# Syslog Name
+SyslogIdentifier=mysql-mariadb-snapshot

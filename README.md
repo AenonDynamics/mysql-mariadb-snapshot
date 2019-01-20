@@ -57,7 +57,9 @@ MYSQL_TMP_DIR=/tmp/mysqldump
 ...
 ```
 
-### 4. Setup cron for scheduled backups ###
+## Schedule ##
+
+### Setup cron for scheduled backups ###
 
 Example: Run Backup every day at 4:15
 
@@ -65,6 +67,39 @@ Note: in case you want to use another account then **debian-sys-maint** it is **
 
 ```bash
 echo "15  4  *  *  * root /usr/bin/mysql-mariadb-snapshot /etc/mysql-mariadb-snapshot/backup.conf" > /etc/cron.d/mysql-mariadb-snapshot
+```
+
+### Setup systemd for scheduled backups ###
+
+mysql-mariadb-snapshot comes with a systemd service and timer. You can easily modify the scripts to match your needs (backup schedule, config path).
+
+The service file is designed to work on per-instance base and uses the instance name as config file name `/etc/mysql-mariadb-snapshot/%I.conf`
+
+**Defaults**
+
+* `/lib/systemd/system/mysql-mariadb-snapshot.timer`
+* `/lib/systemd/system/mysql-mariadb-snapshot.service`
+
+**Example: Run Backup every day at 4:30**
+
+File: `/etc/systemd/system/mysql-mariadb-snapshot.timer`
+
+```ini
+[Unit]
+Description=mysql-mariadb-snapshot task daily
+
+[Timer]
+# Run at 04:30 am
+OnCalendar=04:30
+
+# do NOT start backup immediately if its missed (servers..)
+Persistent=false
+
+# linked unit instance -> use config file `/etc/mysql-mariadb-snapshot/backup.conf`
+Unit=mysql-mariadb-snapshot@backup.service
+
+[Install]
+WantedBy=timers.target
 ```
 
 ## Usage ##

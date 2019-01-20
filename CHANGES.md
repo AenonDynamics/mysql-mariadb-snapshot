@@ -1,3 +1,6 @@
+### 0.4.0 ###
+* Added: systemd service and timer
+
 ### 0.3.0 ###
 * Added: Separate trigger/routines dump
 * Changed: Extended create table statements are used (autoincrement values, charsets)

@@ -1,0 +1,15 @@
+[Unit]
+Description=mysql-mariadb-snapshot task daily
+
+[Timer]
+# Run at 04:30 am
+OnCalendar=04:30
+
+# do NOT start backup immediately if its missed (servers..)
+Persistent=false
+
+# linked unit instance
+Unit=mysql-mariadb-snapshot@backup.service
+
+[Install]
+WantedBy=timers.target
