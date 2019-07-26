@@ -43,10 +43,13 @@ fi
 
 # Connection transport
 # ------------------------------------
+
+# connect via unix socket ?
 if [ ! -z $MYSQL_SOCKET ]; then
     MYSQL_TRANSPORT="--socket=$MYSQL_SOCKET"
 fi
 
+# connect via tcp ?
 if [ ! -z $MYSQL_HOST ]; then
     MYSQL_TRANSPORT="--host=$MYSQL_HOST"
 fi
