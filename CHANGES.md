@@ -1,3 +1,7 @@
+### 1.0.0 ###
+* Added: support for tcp connections
+* Added: custom transport settings via `MYSQL_TRANSPORT`
+
 ### 0.4.0 ###
 * Added: systemd service and timer
 

@@ -41,6 +41,22 @@ if [ ! -x "$MYSQLDUMP_BIN" ]; then
     exit 4
 fi
 
+# Connection transport
+# ------------------------------------
+if [ ! -z $MYSQL_SOCKET ]; then
+    MYSQL_TRANSPORT="--socket=$MYSQL_SOCKET"
+fi
+
+if [ ! -z $MYSQL_HOST ]; then
+    MYSQL_TRANSPORT="--host=$MYSQL_HOST"
+fi
+
+# transport set ?
+if [ -z $MYSQL_TRANSPORT ]; then
+    echo "ERROR: mysql connection transport not set. BACKUP FAILED"
+    exit 8
+fi
+
 # Check Backup Destination
 # ------------------------------------
 if [ ! -d "$MYSQL_BACKUP_LOCATION" ]; then
@@ -59,7 +75,7 @@ fi
 
 # Get Database List
 # ------------------------------------
-DB_LIST="$($MYSQL_BIN --defaults-extra-file=$MYSQL_CONF --socket=$MYSQL_SOCKET -Be 'show databases' | grep -Ev $MYSQL_DB_IGNORE)"
+DB_LIST="$($MYSQL_BIN --defaults-extra-file=$MYSQL_CONF $MYSQL_TRANSPORT -Be 'show databases' | grep -Ev $MYSQL_DB_IGNORE)"
 
 # check success
 if [ $? -ne 0 ]; then
@@ -80,7 +96,7 @@ for DB in $DB_LIST; do
     echo " |- $DB"
 
     # get all views; extract first column
-    VIEWS=$(echo "SHOW FULL TABLES FROM \`$DB\` WHERE table_type="\""VIEW"\" | $MYSQL_BIN --defaults-extra-file=$MYSQL_CONF --socket=$MYSQL_SOCKET -Bs | cut -f1)
+    VIEWS=$(echo "SHOW FULL TABLES FROM \`$DB\` WHERE table_type="\""VIEW"\" | $MYSQL_BIN --defaults-extra-file=$MYSQL_CONF $MYSQL_TRANSPORT -Bs | cut -f1)
 
     # generate arguments
     IGNORE_VIEWS=""
@@ -89,7 +105,7 @@ for DB in $DB_LIST; do
     done
 
     # dump db DATA (exclude views)
-    $MYSQLDUMP_BIN --defaults-extra-file=$MYSQL_CONF --socket=$MYSQL_SOCKET $MYSQLDUMP_OPT --no-create-info --skip-triggers $IGNORE_VIEWS $DB > $MYSQL_TMP_DIR/$NOW/$DB.data.sql
+    $MYSQLDUMP_BIN --defaults-extra-file=$MYSQL_CONF $MYSQL_TRANSPORT $MYSQLDUMP_OPT --no-create-info --skip-triggers $IGNORE_VIEWS $DB > $MYSQL_TMP_DIR/$NOW/$DB.data.sql
 
     # check success
     if [ $? -ne 0 ]; then
@@ -99,7 +115,7 @@ for DB in $DB_LIST; do
     fi
 
     # dump db STRUCTURE (including views)
-    $MYSQLDUMP_BIN --defaults-extra-file=$MYSQL_CONF --socket=$MYSQL_SOCKET $MYSQLDUMP_OPT --no-data --create-options --skip-triggers $DB > $MYSQL_TMP_DIR/$NOW/$DB.structure.sql
+    $MYSQLDUMP_BIN --defaults-extra-file=$MYSQL_CONF $MYSQL_TRANSPORT $MYSQLDUMP_OPT --no-data --create-options --skip-triggers $DB > $MYSQL_TMP_DIR/$NOW/$DB.structure.sql
 
     # check success
     if [ $? -ne 0 ]; then
@@ -109,7 +125,7 @@ for DB in $DB_LIST; do
     fi
 
     # dump db PROCEDURES + TRIGGERS
-    $MYSQLDUMP_BIN --defaults-extra-file=$MYSQL_CONF --socket=$MYSQL_SOCKET $MYSQLDUMP_OPT --triggers --routines --no-data --no-create-info $DB > $MYSQL_TMP_DIR/$NOW/$DB.procedures.sql
+    $MYSQLDUMP_BIN --defaults-extra-file=$MYSQL_CONF $MYSQL_TRANSPORT $MYSQLDUMP_OPT --triggers --routines --no-data --no-create-info $DB > $MYSQL_TMP_DIR/$NOW/$DB.procedures.sql
 
     # check success
     if [ $? -ne 0 ]; then

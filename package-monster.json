@@ -1,6 +1,6 @@
 {
     "name": "mysql-mariadb-snapshot",
-    "version": "0.4.0",
+    "version": "0.5.0",
     "package-monster": "0.4.0",
     "description": "Backups MySQL tables and views with mysqldump",
     "license": "MIT",
@@ -12,7 +12,7 @@
     "debian": {
 
         "section": "database",
-        "priority": "extra",
+        "priority": "optional",
 
         "dependencies": [
         ],
