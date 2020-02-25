@@ -1,13 +1,45 @@
 #!/usr/bin/env bash
 
-# -----------------------------------------------------------------------------
+# ----------------------------------------------------------------------
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+# --
+# Copyright 2018-2020 Andi Dittrich <https://aenon-dynamics.com>
+# ----------------------------------------------------------------------
+
+# ----------------------------------------------------------------------
 # - Aenon Dynamics MySQL/MariaDB Backup
 # - Backups all tables as well as views automatically
-#
-# - Author: Andi Dittrich <opensource@aenon-dynamics.com>
-# - License: The MIT License (X11 License)
 # - Website: https://github.com/AenonDynamics/mysql-mariadb-snapshot
-# -----------------------------------------------------------------------------
+# ----------------------------------------------------------------------
+
+VERSION="1.0.0"
+
+show_usage(){
+    cat << EOF
+Usage: mysql-mariadb-snapshot <command>
+  Commands:
+    <config-file>               Run backup using specific confid file
+    --help                      Displays this help
+    --version                   Displays version
+EOF
+    exit 0
+}
+
+show_version(){
+    cat << EOF
+mysql-mariadb-snapshot
+ - Version: ${VERSION}
+ - License: MPL-2.0 http://mozilla.org/MPL/2.0/
+ - Repository: https://github.com/AenonDynamics/mysql-mariadb-snapshot
+EOF
+    exit 0
+}
+
+# simple processing
+[ "$1" = "--help" ] && show_usage
+[ "$1" = "--version" ] && show_version
 
 # vars
 NOW=$(date +"%d-%m-%Y")
@@ -17,7 +49,7 @@ RETURN_CODE=0
 
 # config file set ?
 if [ -z "$1" ]; then
-    echo "Usage: $0 <config>"
+    show_usage
     exit 1
 fi
 
@@ -41,21 +73,28 @@ if [ ! -x "$MYSQLDUMP_BIN" ]; then
     exit 4
 fi
 
+# Check for existing backup file
+# ------------------------------------
+if [ -f "$MYSQL_BACKUP_LOCATION/$MYSQL_BACKUPFILE" ]; then
+    echo "ERROR: backup file ($MYSQL_BACKUP_LOCATION/$MYSQL_BACKUPFILE) already exists. BACKUP FAILED"
+    exit 9
+fi
+
 # Connection transport
 # ------------------------------------
 
 # connect via unix socket ?
-if [ ! -z $MYSQL_SOCKET ]; then
+if [ ! -z "$MYSQL_SOCKET" ]; then
     MYSQL_TRANSPORT="--socket=$MYSQL_SOCKET"
 fi
 
 # connect via tcp ?
-if [ ! -z $MYSQL_HOST ]; then
+if [ ! -z "$MYSQL_HOST" ]; then
     MYSQL_TRANSPORT="--host=$MYSQL_HOST"
 fi
 
 # transport set ?
-if [ -z $MYSQL_TRANSPORT ]; then
+if [ -z "$MYSQL_TRANSPORT" ]; then
     echo "ERROR: mysql connection transport not set. BACKUP FAILED"
     exit 8
 fi
@@ -68,12 +107,19 @@ if [ ! -d "$MYSQL_BACKUP_LOCATION" ]; then
 fi
 
 # get permission (not world readable)
-stat -c "%a" $MYSQL_BACKUP_LOCATION | grep "..[0]" > /dev/null
-
-# check success
-if [ $? -ne 0 ]; then
+stat -c "%a" $MYSQL_BACKUP_LOCATION | grep "..[0]" > /dev/null || {
     echo "ERROR: Backup destination is world accessible. Check directory permissions! BACKUP FAILED"
     exit 6
+}
+
+# Check encryption
+# ------------------------------------
+if [ ! -z "$GPG_RECIPIENT" ]; then
+    # check publickey file
+    if [ ! -f "$GPG_PUBLICKEY" ]; then
+        echo "ERROR: GPG encryption enabled but publickey file doesn't exists! BACKUP FAILED"
+        exit 11
+    fi
 fi
 
 # Get Database List
@@ -88,8 +134,10 @@ fi
 
 # Prepare tmp dir
 # -----------------------------------
-mkdir -p $MYSQL_TMP_DIR/$NOW
-chmod 0770 $MYSQL_TMP_DIR
+mkdir -p $MYSQL_TMP_DIR/$NOW && chmod 0770 $MYSQL_TMP_DIR || {
+    echo "ERROR: cannot create tmp dir ${MYSQL_TMP_DIR}. BACKUP FAILED"
+    exit 10
+}
 
 # Run Mysqldump for each database
 # -----------------------------------
@@ -97,6 +145,11 @@ echo ""
 echo "Dumping Databases.."
 for DB in $DB_LIST; do
     echo " |- $DB"
+
+    # filenames
+    FILENAME_DATA="$MYSQL_TMP_DIR/$NOW/$DB.data.sql"
+    FILENAME_STRUCTURE="$MYSQL_TMP_DIR/$NOW/$DB.structure.sql"
+    FILENAME_PROCEDURES="$MYSQL_TMP_DIR/$NOW/$DB.procedures.sql"
 
     # get all views; extract first column
     VIEWS=$(echo "SHOW FULL TABLES FROM \`$DB\` WHERE table_type="\""VIEW"\" | $MYSQL_BIN --defaults-extra-file=$MYSQL_CONF $MYSQL_TRANSPORT -Bs | cut -f1)
@@ -108,7 +161,19 @@ for DB in $DB_LIST; do
     done
 
     # dump db DATA (exclude views)
-    $MYSQLDUMP_BIN --defaults-extra-file=$MYSQL_CONF $MYSQL_TRANSPORT $MYSQLDUMP_OPT --no-create-info --skip-triggers $IGNORE_VIEWS $DB > $MYSQL_TMP_DIR/$NOW/$DB.data.sql
+    if [ -z "$GPG_RECIPIENT" ]; then
+        $MYSQLDUMP_BIN --defaults-extra-file=$MYSQL_CONF $MYSQL_TRANSPORT $MYSQLDUMP_OPT --no-create-info --skip-triggers $IGNORE_VIEWS $DB > $FILENAME_DATA
+    else
+        $MYSQLDUMP_BIN --defaults-extra-file=$MYSQL_CONF $MYSQL_TRANSPORT $MYSQLDUMP_OPT --no-create-info --skip-triggers $IGNORE_VIEWS $DB | gpg \
+            --no-options \
+            --no-default-keyring \
+            --primary-keyring "$GPG_PUBLICKEY" \
+            --encrypt \
+            --cipher-algo AES256 \
+            --always-trust \
+            --no-random-seed-file \
+            -r "$GPG_RECIPIENT" > ${FILENAME_DATA}.gpg
+    fi
 
     # check success
     if [ $? -ne 0 ]; then
@@ -118,7 +183,19 @@ for DB in $DB_LIST; do
     fi
 
     # dump db STRUCTURE (including views)
-    $MYSQLDUMP_BIN --defaults-extra-file=$MYSQL_CONF $MYSQL_TRANSPORT $MYSQLDUMP_OPT --no-data --create-options --skip-triggers $DB > $MYSQL_TMP_DIR/$NOW/$DB.structure.sql
+    if [ -z "$GPG_RECIPIENT" ]; then
+        $MYSQLDUMP_BIN --defaults-extra-file=$MYSQL_CONF $MYSQL_TRANSPORT $MYSQLDUMP_OPT --no-data --create-options --skip-triggers $DB > $FILENAME_STRUCTURE
+    else
+        $MYSQLDUMP_BIN --defaults-extra-file=$MYSQL_CONF $MYSQL_TRANSPORT $MYSQLDUMP_OPT --no-data --create-options --skip-triggers $DB | gpg \
+            --no-options \
+            --no-default-keyring \
+            --primary-keyring "$GPG_PUBLICKEY" \
+            --encrypt \
+            --cipher-algo AES256 \
+            --always-trust \
+            --no-random-seed-file \
+            -r "$GPG_RECIPIENT" > ${FILENAME_STRUCTURE}.gpg
+    fi
 
     # check success
     if [ $? -ne 0 ]; then
@@ -128,7 +205,19 @@ for DB in $DB_LIST; do
     fi
 
     # dump db PROCEDURES + TRIGGERS
-    $MYSQLDUMP_BIN --defaults-extra-file=$MYSQL_CONF $MYSQL_TRANSPORT $MYSQLDUMP_OPT --triggers --routines --no-data --no-create-info $DB > $MYSQL_TMP_DIR/$NOW/$DB.procedures.sql
+    if [ -z "$GPG_RECIPIENT" ]; then
+        $MYSQLDUMP_BIN --defaults-extra-file=$MYSQL_CONF $MYSQL_TRANSPORT $MYSQLDUMP_OPT --triggers --routines --no-data --no-create-info $DB > $FILENAME_PROCEDURES
+    else
+        $MYSQLDUMP_BIN --defaults-extra-file=$MYSQL_CONF $MYSQL_TRANSPORT $MYSQLDUMP_OPT --triggers --routines --no-data --no-create-info $DB | gpg \
+            --no-options \
+            --no-default-keyring \
+            --primary-keyring "$GPG_PUBLICKEY" \
+            --encrypt \
+            --cipher-algo AES256 \
+            --always-trust \
+            --no-random-seed-file \
+            -r "$GPG_RECIPIENT" > ${FILENAME_PROCEDURES}.gpg
+    fi
 
     # check success
     if [ $? -ne 0 ]; then
@@ -145,26 +234,24 @@ echo ""
 echo "Compressing Backup.."
 echo " |- location $MYSQL_BACKUP_LOCATION/$MYSQL_BACKUPFILE"
 
-# tar, bzip2
-tar cfj $MYSQL_BACKUP_LOCATION/$MYSQL_BACKUPFILE $NOW
-
-# Checkup
-if [ $? -ne 0 ]; then
-    echo " |- ERROR: cannot create Backup Archive"
-    RETURN_CODE=12
-else
+# tar, gzip
+tar cfz $MYSQL_BACKUP_LOCATION/$MYSQL_BACKUPFILE $NOW && {
     # show size
     FSIZE=$(du -h $MYSQL_BACKUP_LOCATION/$MYSQL_BACKUPFILE | cut -f1)
-
     echo " |- completed | $FSIZE"
-fi
+} || {
+    echo " |- ERROR: cannot create Backup Archive"
+    RETURN_CODE=12
+}
 
 # Cleanup tmp dir
 # -----------------------------------
 echo ""
 echo "Cleaning up temporary data.."
-rm $MYSQL_TMP_DIR/$NOW/*
-rmdir $MYSQL_TMP_DIR/$NOW
+rm $MYSQL_TMP_DIR/$NOW/* && rmdir $MYSQL_TMP_DIR/$NOW || {
+    echo " |- ERROR: cleanup failed"
+    RETURN_CODE=13
+}
 
 # Old File Cleanup
 # ------------------------------------
@@ -173,7 +260,7 @@ rmdir $MYSQL_TMP_DIR/$NOW
 if [ "$MYSQL_BACKUP_LIFETIME" -gt "10" ]; then
     echo ""
     echo "Dropping old backups.."
-    find $MYSQL_BACKUP_LOCATION -name "*.tar.bz2" -type f -mtime +$MYSQL_BACKUP_LIFETIME -delete
+    find $MYSQL_BACKUP_LOCATION -name "*.tgz" -type f -mtime +$MYSQL_BACKUP_LIFETIME -delete
     echo " |- completed"
 fi
 

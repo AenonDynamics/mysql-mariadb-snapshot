@@ -8,12 +8,13 @@ Backups MySQL/MariaDB tables and views separately with mysqldump. Each table/str
 * Dumps Tables+Views separately (two files for each database)
 * Suitable to use with small Databases < 1GB
 * Exclude Databases from backup
-* Backups are stored as compressed `.tar.bz2` archives
+* Backups are stored as compressed `.tgz` archives
 * Backup multiple database instances
 * Cleanup of old backups using `find`
 * Custom options
 * Uses **debian-sys-maint** user or a dedicated backup account
 * Suitable to use with MySQL or MariaDB (both shipped with mysqldump)
+* Optional file encryption via `gpg` using a publickey file
 
 ## Package Installation ##
 
@@ -50,7 +51,7 @@ MYSQL_BACKUP_LOCATION=/backup/mysql
 MYSQL_BACKUP_LIFETIME=200
 
 # filename - $NOW is defined as $(date +"%d-%m-%Y")
-MYSQL_BACKUPFILE=mysql.$NOW.tar.bz2
+MYSQL_BACKUPFILE=mysql.$NOW.tgz
 
 # tmp dir
 MYSQL_TMP_DIR=/tmp/mysqldump
@@ -108,15 +109,40 @@ WantedBy=timers.target
 mysql-mariadb-snapshot <config>
 ```
 
+## Backup Encryption ##
+
+The backup - this means every single file within the tar archive - can optionally encrypted using a **gnupg** publickey. You should be familar with gnupg/openpgp before using this feature - otherwise the backups may become inaccesible. 
+
+**Export a public key**
+
+```
+gpg \
+    --no-options \
+    --export \
+    "246C BBDF 5D82 D7CC 786B  6D6D 3693 5688 EC2C 82E9" > publickey.gpg
+```
+
+**Configuration**
+
+```bash
+...
+
+# optional gpg encryption
+GPG_RECIPIENT="246C BBDF 5D82 D7CC 786B  6D6D 3693 5688 EC2C 82E9"
+GPG_PUBLICKEY="/etc/mariadb/backupkey.gpg"
+```
+
 ## Distributions ##
 
 Tested with:
 
-* Debian Jessie 8.7
+* Debian jessie
+* Debian stretch
+* Debian buster
 
 ## Contribution ##
 
 The **.deb** package is automatically generated via a **Continuous Delivery Pipeline** - please do not build packages manually!
 
 ## License ##
-MYSQL-MARIADB-SNAPSHOT is OpenSource and licensed under the Terms of [The MIT License (X11)](http://opensource.org/licenses/MIT) - your're welcome to contribute
+MYSQL-MARIADB-SNAPSHOT is OpenSource and licensed under the Terms of [Mozilla Public License 2.0](https://opensource.org/licenses/MPL-2.0). You're welcome to [contribute](docs/CONTRIBUTING.md)

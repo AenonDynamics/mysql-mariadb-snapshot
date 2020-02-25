@@ -3,7 +3,7 @@
     "version": "1.0.0",
     "package-monster": "0.4.0",
     "description": "Backups MySQL/MariaDB tables and views with mysqldump",
-    "license": "MIT",
+    "license": "MPL-2.0",
     "author": "Andi Dittrich <opensource@aenon-dynamics.com>",
     "website": "https://github.com/AenonDynamics/mysql-mariadb-snapshot",
     "bugs": "https://github.com/AenonDynamics/mysql-mariadb-snapshot/issues",
